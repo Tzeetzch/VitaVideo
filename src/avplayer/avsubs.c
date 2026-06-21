@@ -39,7 +39,7 @@ static char *avCleanSrtDialog(char *dialog)
         }
     }
     else
-        strncpy(out, dialog, strlen(dialog));
+        out = dialog;   /* no markup -> use the line as-is (was: write through an uninitialised pointer) */
     if (strchr(out, '\r')) {
         int len = strlen(out) + 1;
         for(int i = 0; i<len ; i++)
@@ -76,10 +76,15 @@ static SceVoid avParseSrt()
                 while (fgets(buf, 1024, srtFile)) {
                     if (strlen(buf) == 1)
                         break;
-                    strcat(srtText, buf);
+                    if (strlen(srtText) + strlen(buf) < sizeof(srtText))
+                        strcat(srtText, buf);   /* bounded: don't overflow srtText[2048] */
                 }
                 char *tempText = avCleanSrtDialog(srtText);
-                strncpy(srtSubtitlesCurrent->dialog, tempText, strlen(tempText));
+                size_t dlen = strlen(tempText);
+                if (dlen > sizeof(srtSubtitlesCurrent->dialog) - 1)
+                    dlen = sizeof(srtSubtitlesCurrent->dialog) - 1;
+                memcpy(srtSubtitlesCurrent->dialog, tempText, dlen);
+                srtSubtitlesCurrent->dialog[dlen] = '\0';   /* ensure NUL-termination */
                 srtSubtitlesCurrent->index = curIndex;
                 srtSubtitlesCurrent->next = (SrtStructure_t *)malloc(sizeof(SrtStructure_t));
                 srtSubtitlesCurrent = srtSubtitlesCurrent->next;

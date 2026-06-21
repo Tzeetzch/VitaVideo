@@ -463,6 +463,12 @@ int startPlayback(char *filename)
         watchdbSave();
     }
     sceAvPlayerClose(player);
+	/* Reap the per-episode worker threads (they have all exited by now, since
+	   the player is no longer active) so their UIDs aren't leaked when chaining
+	   episodes or opening many videos in one session. */
+	if (AVPlayerThreadId > 0) { sceKernelWaitThreadEnd(AVPlayerThreadId, NULL, NULL); sceKernelDeleteThread(AVPlayerThreadId); }
+	if (audioThreadId > 0)    { sceKernelWaitThreadEnd(audioThreadId, NULL, NULL);    sceKernelDeleteThread(audioThreadId); }
+	if (timerThreadId > 0)    { sceKernelWaitThreadEnd(timerThreadId, NULL, NULL);    sceKernelDeleteThread(timerThreadId); }
 	printf("Freeing?\n\n");
 	avFreeSrt();
 	if (frameTexture != NULL)
