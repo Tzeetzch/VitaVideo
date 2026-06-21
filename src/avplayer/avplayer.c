@@ -314,6 +314,7 @@ int startPlayback(char *filename)
 	else 
 		subType = SUBTITLES_TIMED_TEXT;
 	file = filename;
+	watchdbSetLastPlayed(filename);
 	rad = 0.0f;
 	playerStatus = PLAYER_LOADING;
 	SceUID AVPlayerThreadId = 0;

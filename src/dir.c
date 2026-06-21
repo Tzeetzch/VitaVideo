@@ -19,6 +19,9 @@ int config = 0;
 
 File *files = NULL;
 
+char continueTarget[512] = {0};   /* full path the Continue/Next action will play */
+char continueLabel[320] = {0};    /* on-screen hint, e.g. "Next: Ep02.mp4" */
+
 
 static void dirListFree(File *node) {
 	if (node == NULL) // End of list
@@ -55,6 +58,86 @@ static int cmpstringp(const void *p1, const void *p2) {
 	}
 
 	return 0;
+}
+
+static int cmpNatName(const void *p1, const void *p2) {
+	return strcmpnat(((SceIoDirent *)p1)->d_name, ((SceIoDirent *)p2)->d_name);
+}
+
+/* Find the video that comes after lastPath in the same folder (natural order).
+ * Returns 0 and fills out on success, -1 if there is no next episode. */
+int findNextEpisode(const char *lastPath, char *out, int outSize) {
+	const char *slash = strrchr(lastPath, '/');
+	if (!slash)
+		return -1;
+	int folderLen = (int)(slash - lastPath) + 1;   /* keep the trailing '/' */
+	char folder[512];
+	if (folderLen <= 0 || folderLen >= (int)sizeof(folder))
+		return -1;
+	memcpy(folder, lastPath, folderLen);
+	folder[folderLen] = '\0';
+	const char *lastName = slash + 1;
+
+	SceUID dir = sceIoDopen(folder);
+	if (dir < 0)
+		return -1;
+
+	SceIoDirent *entries = (SceIoDirent *)calloc(MAX_FILES, sizeof(SceIoDirent));
+	if (!entries) { sceIoDclose(dir); return -1; }
+
+	int count = 0;
+	while (count < MAX_FILES && sceIoDread(dir, &entries[count]) > 0) {
+		if (!SCE_S_ISDIR(entries[count].d_stat.st_mode) &&
+		    !strncasecmp(getFileExt(entries[count].d_name), "mp4", 4))
+			count++;   /* keep mp4 files; otherwise the slot is reused */
+	}
+	sceIoDclose(dir);
+
+	qsort(entries, count, sizeof(SceIoDirent), cmpNatName);
+
+	int ret = -1;
+	for (int i = 0; i < count; i++) {
+		if (!strcmp(entries[i].d_name, lastName)) {
+			if (i + 1 < count) {
+				int n = snprintf(out, outSize, "%s%s", folder, entries[i + 1].d_name);
+				if (n > 0 && n < outSize)
+					ret = 0;
+			}
+			break;
+		}
+	}
+	free(entries);
+	return ret;
+}
+
+/* Recompute what the Continue/Next action should play, plus its on-screen hint:
+ *  - last video still in progress -> resume it ("Continue: ...")
+ *  - last video finished          -> next episode in its folder ("Next: ...") */
+void updateContinueTarget(void) {
+	continueTarget[0] = '\0';
+	continueLabel[0] = '\0';
+
+	const char *last = watchdbGetLastPlayed();
+	if (!last || !last[0])
+		return;
+
+	const char *baseName;
+	if (watchdbGetState(last) == WATCH_INPROGRESS) {
+		strncpy(continueTarget, last, sizeof(continueTarget) - 1);
+		continueTarget[sizeof(continueTarget) - 1] = '\0';
+		baseName = strrchr(continueTarget, '/');
+		baseName = baseName ? baseName + 1 : continueTarget;
+		snprintf(continueLabel, sizeof(continueLabel), "Continue: %.60s", baseName);
+	} else {
+		char nxt[512];
+		if (findNextEpisode(last, nxt, sizeof(nxt)) == 0) {
+			strncpy(continueTarget, nxt, sizeof(continueTarget) - 1);
+			continueTarget[sizeof(continueTarget) - 1] = '\0';
+			baseName = strrchr(continueTarget, '/');
+			baseName = baseName ? baseName + 1 : continueTarget;
+			snprintf(continueLabel, sizeof(continueLabel), "Next: %.60s", baseName);
+		}
+	}
 }
 
 int getDirListing(SceBool refresh)
@@ -343,8 +426,23 @@ int handleDirControls()
 		else if (pressed & SCE_CTRL_RIGHT)
 			position = file_count - 1;
 
-		if (pressed & SCE_CTRL_CROSS)
+		if (pressed & SCE_CTRL_CROSS) {
+			File *sel = getFileIndex(position);
+			SceBool wasVideo = (sel && !sel->is_dir);
 			openFile();
+			if (wasVideo) {                 /* just returned from playback */
+				updateContinueTarget();
+				getDirListing(SCE_FALSE);   /* refresh watched dots, keep position */
+			}
+		}
+	}
+
+	/* Triangle: smart Continue / Next-episode (resume last, or play the
+	 * following episode if the last one is finished). */
+	if ((pressed & SCE_CTRL_TRIANGLE) && continueTarget[0]) {
+		startPlayback(continueTarget);
+		updateContinueTarget();
+		getDirListing(SCE_FALSE);
 	}
 
 	if ((strcmp(curDir, root_path) != 0) && (pressed & SCE_CTRL_CANCEL)) {

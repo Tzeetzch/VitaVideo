@@ -11,6 +11,10 @@ typedef struct File {
 } File;
 
 extern File *files;
+extern char continueLabel[320];
+
+void updateContinueTarget(void);
+int findNextEpisode(const char *lastPath, char *out, int outSize);
 
 int getDirListing(SceBool refresh);
 void displayFiles();

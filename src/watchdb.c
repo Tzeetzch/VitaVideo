@@ -6,6 +6,7 @@
 #include "watchdb.h"
 
 #define WATCHDB_PATH "ux0:data/SubPlayer/watched.db"
+#define LASTPLAYED_PATH "ux0:data/SubPlayer/lastplayed.txt"
 #define RESUME_MIN_MS   5000   /* don't bother resuming the first few seconds */
 #define WATCHED_PCT_NUM 9      /* >= 90% counts as finished */
 #define WATCHED_PCT_DEN 10
@@ -19,6 +20,7 @@ typedef struct WatchEntry {
 } WatchEntry;
 
 static WatchEntry *dbHead = NULL;
+static char lastPlayed[512] = {0};
 
 static WatchEntry *findEntry(const char *path) {
 	for (WatchEntry *e = dbHead; e != NULL; e = e->next)
@@ -79,6 +81,34 @@ void watchdbLoad(void) {
 		line = nl + 1;
 	}
 	free(buf);
+
+	/* Last-played video path (for the Continue / Next-episode action). */
+	lastPlayed[0] = '\0';
+	SceUID lf = sceIoOpen(LASTPLAYED_PATH, SCE_O_RDONLY, 0);
+	if (lf >= 0) {
+		int n = sceIoRead(lf, lastPlayed, sizeof(lastPlayed) - 1);
+		sceIoClose(lf);
+		if (n < 0) n = 0;
+		lastPlayed[n] = '\0';
+		/* trim trailing newline/whitespace */
+		while (n > 0 && (lastPlayed[n-1] == '\n' || lastPlayed[n-1] == '\r' || lastPlayed[n-1] == ' '))
+			lastPlayed[--n] = '\0';
+	}
+}
+
+void watchdbSetLastPlayed(const char *path) {
+	if (!path || !path[0] || strlen(path) >= sizeof(lastPlayed))
+		return;
+	strcpy(lastPlayed, path);
+	SceUID fd = sceIoOpen(LASTPLAYED_PATH, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+	if (fd >= 0) {
+		sceIoWrite(fd, lastPlayed, strlen(lastPlayed));
+		sceIoClose(fd);
+	}
+}
+
+const char *watchdbGetLastPlayed(void) {
+	return lastPlayed;
 }
 
 void watchdbSave(void) {

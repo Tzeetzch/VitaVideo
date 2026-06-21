@@ -25,4 +25,8 @@ int watchdbGetState(const char *path);
 /* Record current playback position; auto-marks WATCHED once near the end. */
 void watchdbUpdate(const char *path, uint64_t position, uint64_t duration);
 
+/* Remember / fetch the most recently started video (for Continue / Next). */
+void watchdbSetLastPlayed(const char *path);
+const char *watchdbGetLastPlayed(void);
+
 #endif
