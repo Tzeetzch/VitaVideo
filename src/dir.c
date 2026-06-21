@@ -372,7 +372,7 @@ int navigate(SceBool parent) {
 }
 
 void openFile(void) {
-	char path[512];
+	char path[1024];   /* curDir (up to 512) + filename (up to 256) can exceed 512 */
 	File *file = getFileIndex(position);
 
 	if (file == NULL)

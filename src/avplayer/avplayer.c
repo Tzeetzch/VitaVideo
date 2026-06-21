@@ -377,7 +377,7 @@ static int drawLoading()
 
 int startPlayback(char *filename)
 {
-	char curBuf[512];
+	char curBuf[1024];
 	strncpy(curBuf, filename, sizeof(curBuf) - 1);
 	curBuf[sizeof(curBuf) - 1] = '\0';
 	filename = curBuf;   /* mutable, so the R "play next" button can chain episodes in place */
