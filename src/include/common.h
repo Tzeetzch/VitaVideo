@@ -63,6 +63,11 @@ extern vita2d_pvf *subtitleFont;
 extern SceUInt32 SCE_CTRL_ENTER;
 extern SceUInt32 SCE_CTRL_CANCEL;
 extern SceUInt32 pressed;
+extern int touchActive;          /* 1 while a finger is on the front panel */
+extern int touchX;               /* touch position in screen coords (960x544) */
+extern int touchY;
+extern unsigned char stickLX;    /* left analog stick (0..255, 128 = centre) */
+extern unsigned char stickLY;
 extern vita2d_pgf *pgf;
 extern void *mspaceGlobal;
 extern int position;

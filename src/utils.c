@@ -5,6 +5,7 @@
 #include <appmgr.h>
 #include <kernel/processmgr.h>
 #include <system_param.h>
+#include <psp2/touch.h>
 
 /* Natural-order compare: runs of digits are compared by numeric value so that
  * "Ep2" < "Ep10" < "Ep20" instead of lexical "Ep1, Ep10, Ep2". Otherwise
@@ -39,7 +40,21 @@ int readControls(void) {
 	sceCtrlPeekBufferPositive(0, &pad, 1);
 
 	pressed = pad.buttons & ~old_pad.buttons;
-	
+	stickLX = pad.lx;
+	stickLY = pad.ly;
+
+	/* Front touch panel reports at 2x the screen resolution (1920x1088). */
+	SceTouchData td;
+	memset(&td, 0, sizeof(td));
+	sceTouchPeek(SCE_TOUCH_PORT_FRONT, &td, 1);
+	if (td.reportNum > 0) {
+		touchActive = 1;
+		touchX = td.report[0].x / 2;
+		touchY = td.report[0].y / 2;
+	} else {
+		touchActive = 0;
+	}
+
 	old_pad = pad;
 	return 0;
 }

@@ -86,6 +86,62 @@ static void handleAVPlayerControls()
 		playNextRequested = 1;
 		sceAvPlayerStop(player);
 	}
+
+	/* ---- Volume via the left analog stick (up = louder, down = quieter) ---- */
+	if (stickLY < 80)
+		avSoundSetVolume(avSoundGetVolume() + 1);
+	else if (stickLY > 175)
+		avSoundSetVolume(avSoundGetVolume() - 1);
+
+	/* ---- Front touchscreen: tap to show/hide HUD, tap centre = play/pause,
+	   drag the progress bar to scrub ---- */
+	{
+		static int touchWas = 0, scrubbing = 0, downX = 0, downY = 0, lastX = 0, wasVisibleAtDown = 0, sf = 0;
+		const float barX0 = FRAMEBUF_WIDTH * 0.12f, barX1 = FRAMEBUF_WIDTH * 0.88f;
+		const float barTop = FRAMEBUF_HEIGHT * 0.74f, barBot = FRAMEBUF_HEIGHT * 0.86f;
+
+		if (touchActive) {
+			lastX = touchX;
+			if (!touchWas) {                       /* finger just went down */
+				downX = touchX; downY = touchY;
+				wasVisibleAtDown = overlayEnable;
+				scrubbing = (overlayEnable && touchX >= barX0 && touchX <= barX1 &&
+				             touchY >= barTop && touchY <= barBot);
+				sceKernelSetEventFlag(eventUid, OVERLAY_ACTIVE);   /* show/keep HUD */
+			}
+			if (scrubbing && streamDuration > 0 && (sf++ & 7) == 0) {  /* live scrub, throttled */
+				float frac = (lastX - barX0) / (barX1 - barX0);
+				if (frac < 0) frac = 0;
+				if (frac > 1) frac = 1;
+				sceAvPlayerJumpToTime(player, (uint64_t)(frac * streamDuration));
+				subReset = 1;
+			}
+		} else if (touchWas) {                     /* finger just released */
+			if (scrubbing && streamDuration > 0) {
+				float frac = (lastX - barX0) / (barX1 - barX0);
+				if (frac < 0) frac = 0;
+				if (frac > 1) frac = 1;
+				sceAvPlayerJumpToTime(player, (uint64_t)(frac * streamDuration));
+				subReset = 1;
+			} else if (wasVisibleAtDown) {         /* a tap while the HUD was showing */
+				int inPlay = (downX > FRAMEBUF_WIDTH * 0.42f && downX < FRAMEBUF_WIDTH * 0.58f &&
+				              downY > FRAMEBUF_HEIGHT * 0.84f && downY < FRAMEBUF_HEIGHT * 0.97f);
+				if (inPlay) {
+					if (0 > sceAvPlayerPause(player)) {
+						sceAvPlayerResume(player);
+						sceKernelSetEventFlag(eventUid, OVERLAY_ACTIVE);
+					} else {
+						sceKernelSetEventFlag(eventUid, OVERLAY_PAUSED);
+					}
+				} else {
+					sceKernelSetEventFlag(eventUid, OVERLAY_CLOSED);   /* tap empty area = hide */
+				}
+			}
+			/* (HUD was hidden -> the touch-down already showed it; nothing else) */
+			scrubbing = 0;
+		}
+		touchWas = touchActive;
+	}
 }
 
 int avPlayerInit()

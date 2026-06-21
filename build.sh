@@ -54,7 +54,7 @@ LIBS="
   -lvita2d -lScePgf_stub -lScePvf_stub -lfreetype -lpng16 -ljpeg -lz
   -lSceGxm_stub -lSceCommonDialog_stub -lSceDisplay_stub -lSceSysmem_stub
   -lSceLibKernel_stub -lSceKernelThreadMgr_stub -lSceProcessmgr_stub
-  -lSceCtrl_stub -lSceAudio_stub -lSceSysmodule_stub -lSceAppUtil_stub
+  -lSceCtrl_stub -lSceTouch_stub -lSceAudio_stub -lSceSysmodule_stub -lSceAppUtil_stub
   -lSceAppMgr_stub -lSceAvPlayer_stub -lm
 "
 echo ">> Compiling and linking..."

@@ -12,6 +12,20 @@ static int sampleRate = 48000;
 static int sampleChannels = 2;
 static int pcmBufferSize = SINGLE_PCM_BUFFER*2;
 static int portId = -1;
+static int volumePercent = 100;
+
+int avSoundGetVolume(void) { return volumePercent; }
+
+int avSoundSetVolume(int pct) {
+	if (pct < 0) pct = 0;
+	if (pct > 100) pct = 100;
+	volumePercent = pct;
+	if (portId < 0)
+		return -1;
+	int v = (SCE_AUDIO_OUT_MAX_VOL * pct) / 100;
+	int vol[2] = { v, v };
+	return sceAudioOutSetVolume(portId, SCE_AUDIO_VOLUME_FLAG_L_CH | SCE_AUDIO_VOLUME_FLAG_R_CH, vol);
+}
 
 int avSoundInit()
 {
