@@ -368,6 +368,13 @@ const char *sortOrderName(void) {
 	return "?";
 }
 
+int getSortOrder(void) { return config; }
+
+void setSortOrder(int s) {
+	if (s < 0) s = 0;
+	config = s % 4;
+}
+
 File *getFileIndex(int index) {
 	int i = 0;
 	File *file = files; // Find file Item

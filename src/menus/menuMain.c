@@ -6,6 +6,7 @@
 #include "avsound.h"
 #include "watchdb.h"
 #include "tent.h"
+#include "config.h"
 
 static int currentTab = TAB_FOLDERS;
 
@@ -19,8 +20,9 @@ static int currentTab = TAB_FOLDERS;
 #define SET_ROW_X  (FRAMEBUF_WIDTH  * 0.10f)
 #define SET_ROW_W  (FRAMEBUF_WIDTH  * 0.80f)
 #define SET_ROW_H  (FRAMEBUF_HEIGHT * 0.12f)
-#define SET_SORT_Y (TOPBAR_H + FRAMEBUF_HEIGHT * 0.10f)
-#define SET_DIM_Y  (TOPBAR_H + FRAMEBUF_HEIGHT * 0.26f)
+#define SET_SORT_Y  (TOPBAR_H + FRAMEBUF_HEIGHT * 0.08f)
+#define SET_DIM_Y   (TOPBAR_H + FRAMEBUF_HEIGHT * 0.23f)
+#define SET_SLEEP_Y (TOPBAR_H + FRAMEBUF_HEIGHT * 0.38f)
 
 #define TAP_MAX_MOVE (FRAMEBUF_HEIGHT * 0.12f)   /* beyond this a touch is a swipe, not a tap */
 
@@ -29,6 +31,7 @@ int initMainMenu()
     pgf = vita2d_load_default_pgf();
     subtitleFont = vita2d_load_custom_pvf("app0:OpenSans-Bold.ttf");
     watchdbLoad();
+    configLoad();                 /* restore sort / brightness / default-sleep */
     getLastDirectory();
     getDirListing(SCE_FALSE);
     updateContinueTarget();
@@ -78,7 +81,14 @@ static void drawSettings(void)
     snprintf(line, sizeof(line), "Brightness:  %d%%", tentBrightnessPercent());
     vita2d_pgf_draw_text(pgf, SET_ROW_X + FRAMEBUF_WIDTH*0.02f, SET_DIM_Y + SET_ROW_H*0.62f, RGBA8(255, 255, 255, 255), 1.0f, line);
 
-    vita2d_pgf_draw_text(pgf, SET_ROW_X, SET_DIM_Y + FRAMEBUF_HEIGHT*0.24f,
+    vita2d_draw_rectangle(SET_ROW_X, SET_SLEEP_Y, SET_ROW_W, SET_ROW_H, RGBA8(55, 55, 60, 255));
+    if (tentGetSleepDefault() > 0)
+        snprintf(line, sizeof(line), "Default sleep:  %d min", tentGetSleepDefault());
+    else
+        snprintf(line, sizeof(line), "Default sleep:  Off");
+    vita2d_pgf_draw_text(pgf, SET_ROW_X + FRAMEBUF_WIDTH*0.02f, SET_SLEEP_Y + SET_ROW_H*0.62f, RGBA8(255, 255, 255, 255), 1.0f, line);
+
+    vita2d_pgf_draw_text(pgf, SET_ROW_X, SET_SLEEP_Y + FRAMEBUF_HEIGHT*0.22f,
         RGBA8(160, 160, 160, 255), 0.9f, "Vita Media Player DEV  -  tap a row to change  -  L/R switch tabs");
 }
 
@@ -137,8 +147,9 @@ static void handleSettings(void)
     } else if (twas) {
         int dy = lastY - downY; if (dy < 0) dy = -dy;
         if (dy < (int)TAP_MAX_MOVE && downY >= (int)TOPBAR_H) {
-            if (inRow(downX, downY, SET_SORT_Y)) cycleSortOrder();
-            else if (inRow(downX, downY, SET_DIM_Y)) tentCycleBrightness();
+            if (inRow(downX, downY, SET_SORT_Y)) { cycleSortOrder(); configSave(); }
+            else if (inRow(downX, downY, SET_DIM_Y)) { tentCycleBrightness(); configSave(); }
+            else if (inRow(downX, downY, SET_SLEEP_Y)) { tentCycleSleepDefault(); configSave(); }
         }
     }
     twas = touchActive;

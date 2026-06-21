@@ -67,7 +67,7 @@ static int drawStatus()
 	float scale = (FRAMEBUF_WIDTH * .05f) / 200.0f;
 
 	vita2d_draw_texture_scale_rotate(forwards, HUD_NEXT_X, HUD_ICON_Y, scale, scale, 0.0f);
-	drawClock(HUD_SLEEP_X, HUD_ICON_Y, tentSleepMinutes() > 0);
+	drawClock(HUD_SLEEP_X, HUD_ICON_Y, tentSleepArmed());
 
 	switch (playerState) {
 		case PLAYER_PLAYING:

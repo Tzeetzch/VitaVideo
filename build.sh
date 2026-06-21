@@ -33,7 +33,7 @@ mkdir -p "$BUILD/resources"
 # -fno-common, so restore the old behaviour rather than rewrite the headers.
 CFLAGS="-Wl,-q -O2 -std=c99 -DNDEBUG -fcommon -Isrc/include -Wno-format"
 SRCS="
-  src/main.c src/utils.c src/dir.c src/fs.c src/texture.c src/commonValues.c src/watchdb.c src/tent.c
+  src/main.c src/utils.c src/dir.c src/fs.c src/texture.c src/commonValues.c src/watchdb.c src/tent.c src/config.c
   src/menus/menuMain.c src/menus/menuInfo.c
   src/avplayer/avsubs.c src/avplayer/avplayer.c src/avplayer/avsound.c
   src/avplayer/avplayerUtils.c src/avplayer/overlay.c

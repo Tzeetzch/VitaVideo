@@ -382,6 +382,9 @@ int startPlayback(char *filename)
 	curBuf[sizeof(curBuf) - 1] = '\0';
 	filename = curBuf;   /* mutable, so the R "play next" button can chain episodes in place */
 
+	if (!tentSleepArmed())   /* arm the default sleep timer once per session */
+		tentArmSleepDefault();
+
 	do {
 	playNextRequested = 0;
 	subStatus = SUBTITLES_NONE;

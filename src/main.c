@@ -30,8 +30,8 @@ int main()
     /* Standard open-source vita2d is statically linked and fixed at the
      * Vita's native 960x544 framebuffer, so the vita2d_sys module load and
      * the 1080p resolution setters are no longer needed. */
+    tentInit();        /* before initVita2d -> initMainMenu -> configLoad restores brightness */
     initVita2d();
-    tentInit();
     initAppUtil();
 	SCE_CTRL_ENTER = getEnterButton();
 	SCE_CTRL_CANCEL = getCancelButton();

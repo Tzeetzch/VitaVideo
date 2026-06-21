@@ -19,6 +19,8 @@ void drawItemMenu(void);
 void playContinue(void);
 void cycleSortOrder(void);
 const char *sortOrderName(void);
+int getSortOrder(void);
+void setSortOrder(int s);
 int findNextEpisode(const char *lastPath, char *out, int outSize);
 File *getFileIndex(int index);
 
