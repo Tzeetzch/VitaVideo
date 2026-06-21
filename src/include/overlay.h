@@ -5,11 +5,10 @@
 enum HudHit {
 	HUD_HIT_NONE = 0,
 	HUD_HIT_PLAYPAUSE,
-	HUD_HIT_VOLDOWN,
-	HUD_HIT_VOLUP,
 	HUD_HIT_NEXT,
 	HUD_HIT_SLEEP,
-	HUD_HIT_DIM
+	HUD_HIT_DIM,
+	HUD_HIT_SUBS
 };
 
 int drawOverlay(uint64_t currentTime);
