@@ -5,6 +5,7 @@
 #include "texture.h"
 #include "overlay.h"
 #include "watchdb.h"
+#include "dir.h"
 #include <string.h>
 #include <display.h>
 #include <kernel.h>
@@ -34,6 +35,7 @@ SceKernelSysClock *timerCurrentClock = NULL;
 SceUID callback;
 static SceBool subReset = 0;
 uint64_t playerTime = 0;
+static int playNextRequested = 0;   /* set by the R "play next" button */
 
 SceBool ran;
 
@@ -79,6 +81,10 @@ static void handleAVPlayerControls()
 		int64_t jumpTime = sceAvPlayerCurrentTime(player);
 		sceAvPlayerJumpToTime(player, jumpTime+jumpToTimeOffset);
 		subReset = 1;
+	}
+	if (pressed & SCE_CTRL_RTRIGGER) {        /* manual "play next episode" */
+		playNextRequested = 1;
+		sceAvPlayerStop(player);
 	}
 }
 
@@ -304,6 +310,13 @@ static int drawLoading()
 
 int startPlayback(char *filename)
 {
+	char curBuf[512];
+	strncpy(curBuf, filename, sizeof(curBuf) - 1);
+	curBuf[sizeof(curBuf) - 1] = '\0';
+	filename = curBuf;   /* mutable, so the R "play next" button can chain episodes in place */
+
+	do {
+	playNextRequested = 0;
 	subStatus = SUBTITLES_NONE;
 	SceUID main_thread_uid = sceKernelGetThreadId();
     sceKernelChangeThreadPriority(main_thread_uid, 70);
@@ -385,5 +398,16 @@ int startPlayback(char *filename)
         free(frameTexture);
 	sceKernelDeleteEventFlag(eventUid);
 	sceKernelDeleteTimer(timerUid);
+
+	/* "Play next" (R trigger): chain to the next episode in the same folder.
+	 * Only ever happens because the user pressed it — never automatic. */
+	if (playNextRequested) {
+		char nextEp[512];
+		if (findNextEpisode(filename, nextEp, sizeof(nextEp)) == 0)
+			strcpy(curBuf, nextEp);
+		else
+			playNextRequested = 0;   /* no next episode -> return to browser */
+	}
+	} while (playNextRequested);
     return 0;
 }

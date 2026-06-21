@@ -41,6 +41,7 @@ int drawOverlay(uint64_t currentTime)
     vita2d_draw_rectangle(0,0,FRAMEBUF_WIDTH,FRAMEBUF_HEIGHT,RGBA8(0,0,0,120));
     vita2d_draw_rectangle(FRAMEBUF_WIDTH*.12f,FRAMEBUF_HEIGHT*.8f,FRAMEBUF_WIDTH*.76f, FRAMEBUF_HEIGHT*.027f, RGBA8(255,255,255,255));
     vita2d_draw_rectangle(FRAMEBUF_WIDTH*.12f,FRAMEBUF_HEIGHT*.8f,(FRAMEBUF_WIDTH*.76f)*percentageDone,FRAMEBUF_HEIGHT*.027f, RGBA8(120, 120, 255, 200));
+    vita2d_pgf_draw_text(pgf, FRAMEBUF_WIDTH*0.04f, FRAMEBUF_HEIGHT*0.1f, RGBA8(220, 220, 220, 255), 1.0f, "R: Next episode");
     drawStatus();
     return 0;
 }
