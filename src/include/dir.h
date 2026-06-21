@@ -15,6 +15,9 @@ extern char continueLabel[320];
 
 void updateContinueTarget(void);
 void drawContinueBanner(void);
+void playContinue(void);
+void cycleSortOrder(void);
+const char *sortOrderName(void);
 int findNextEpisode(const char *lastPath, char *out, int outSize);
 
 int getDirListing(SceBool refresh);

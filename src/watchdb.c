@@ -12,7 +12,7 @@
 #define WATCHED_PCT_DEN 10
 
 typedef struct WatchEntry {
-	char path[512];
+	char path[1024];
 	uint64_t position;
 	uint64_t duration;
 	int state;
@@ -20,7 +20,7 @@ typedef struct WatchEntry {
 } WatchEntry;
 
 static WatchEntry *dbHead = NULL;
-static char lastPlayed[512] = {0};
+static char lastPlayed[1024] = {0};
 
 static WatchEntry *findEntry(const char *path) {
 	for (WatchEntry *e = dbHead; e != NULL; e = e->next)
@@ -116,7 +116,7 @@ void watchdbSave(void) {
 	if (fd < 0)
 		return;
 
-	char lineBuf[640];
+	char lineBuf[1100];
 	for (WatchEntry *e = dbHead; e != NULL; e = e->next) {
 		int n = snprintf(lineBuf, sizeof(lineBuf), "%d %llu %llu %s\n",
 			e->state, (unsigned long long)e->position,

@@ -75,7 +75,7 @@ int getFileCreatedAt(const char *path, SceDateTime *ctime) {
 	SceIoStat stat;
 	int ret = 0;
 
-	if (R_FAILED(ret = sceIoGetstat(path, &ctime)))
+	if (R_FAILED(ret = sceIoGetstat(path, &stat)))
 		return ret;
 	
 	*ctime = stat.st_ctime;

@@ -265,7 +265,7 @@ void displayFiles() {
 			break;
 		if (position < FILES_PER_PAGE || i > (position - FILES_PER_PAGE)) {
 			if (i == position) {
-				vita2d_draw_rectangle(0, (FRAMEBUF_HEIGHT*ENTRY_SCALE*printed), FRAMEBUF_WIDTH*0.6f, FRAMEBUF_HEIGHT*ENTRY_SCALE, RGBA8(120, 120, 255, 200));
+				vita2d_draw_rectangle(0, (LIST_Y0 + FRAMEBUF_HEIGHT*ENTRY_SCALE*printed), FRAMEBUF_WIDTH*0.6f, FRAMEBUF_HEIGHT*ENTRY_SCALE, RGBA8(120, 120, 255, 200));
 				if (file->is_dir)
 					vita2d_draw_texture_scale(folder, FRAMEBUF_WIDTH - (FRAMEBUF_WIDTH*.3f), FRAMEBUF_HEIGHT*.1f, textureScale, textureScale);
 				else if ((!strncasecmp(file->ext, "flac", 4)) || (!strncasecmp(file->ext, "it", 4)) || (!strncasecmp(file->ext, "mod", 4))
@@ -282,9 +282,9 @@ void displayFiles() {
 			}
 
 			if (strncmp(file->name, "..", 2) == 0)
-				vita2d_pgf_draw_text(pgf, startXScale, (FRAMEBUF_HEIGHT*ENTRY_SCALE/2.0f) + (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed), RGBA8(255, 255, 255, 255), basePgfScale*.9f, "Parent folder");
+				vita2d_pgf_draw_text(pgf, startXScale, LIST_Y0 + (FRAMEBUF_HEIGHT*ENTRY_SCALE/2.0f) + (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed), RGBA8(255, 255, 255, 255), basePgfScale*.9f, "Parent folder");
 			else
-				vita2d_pgf_draw_text(pgf, startXScale, (FRAMEBUF_HEIGHT*ENTRY_SCALE/2.0f) + (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed), RGBA8(255, 255, 255, 255), basePgfScale*.9f, file->name);
+				vita2d_pgf_draw_text(pgf, startXScale, LIST_Y0 + (FRAMEBUF_HEIGHT*ENTRY_SCALE/2.0f) + (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed), RGBA8(255, 255, 255, 255), basePgfScale*.9f, file->name);
 
 			// Per-item watch progress bar for videos (green = finished, orange = partway)
 			if (!file->is_dir && !strncasecmp(file->ext, "mp4", 4)) {
@@ -293,7 +293,7 @@ void displayFiles() {
 				int prog = watchdbGetProgress(fullPath);
 				if (prog >= 0) {
 					float barH = FRAMEBUF_HEIGHT * 0.010f;
-					float barY = (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed) + FRAMEBUF_HEIGHT*ENTRY_SCALE - barH - FRAMEBUF_HEIGHT*0.012f;
+					float barY = LIST_Y0 + (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed) + FRAMEBUF_HEIGHT*ENTRY_SCALE - barH - FRAMEBUF_HEIGHT*0.012f;
 					float barX = startXScale;
 					float trackW = FRAMEBUF_WIDTH * 0.5f;
 					unsigned int fillC = (prog >= 100) ? RGBA8(40, 200, 40, 255) : RGBA8(255, 170, 0, 255);
@@ -319,6 +319,31 @@ void drawContinueBanner(void) {
 		RGBA8(255, 255, 255, 255), bs * 0.8f, continueLabel);
 	vita2d_pgf_draw_text(pgf, BANNER_X + FRAMEBUF_WIDTH*0.015f, BANNER_Y + FRAMEBUF_HEIGHT*0.16f,
 		RGBA8(230, 230, 230, 255), bs * 0.8f, "tap to play");
+}
+
+/* Play the Continue/Next target (used by the Home tab and the banner). */
+void playContinue(void) {
+	if (!continueTarget[0])
+		return;
+	startPlayback(continueTarget);
+	updateContinueTarget();
+	getDirListing(SCE_FALSE);
+}
+
+/* Settings: cycle the folder sort order and re-list. */
+void cycleSortOrder(void) {
+	config = (config + 1) % 4;
+	getDirListing(SCE_FALSE);
+}
+
+const char *sortOrderName(void) {
+	switch (config) {
+		case 0: return "Name (A-Z)";
+		case 1: return "Name (Z-A)";
+		case 2: return "Size (largest)";
+		case 3: return "Size (smallest)";
+	}
+	return "?";
 }
 
 File *getFileIndex(int index) {
@@ -454,9 +479,9 @@ int handleDirControls()
 				startPlayback(continueTarget);       /* tap the Continue banner */
 				updateContinueTarget();
 				getDirListing(SCE_FALSE);
-			} else if (downX < FRAMEBUF_WIDTH * 0.6f && file_count > 0) {
+			} else if (downX < FRAMEBUF_WIDTH * 0.6f && downY >= LIST_Y0 && file_count > 0) {
 				int firstVisible = (position < FILES_PER_PAGE) ? 0 : (position - FILES_PER_PAGE + 1);
-				int row = (int)(downY / (FRAMEBUF_HEIGHT * ENTRY_SCALE));
+				int row = (int)((downY - LIST_Y0) / (FRAMEBUF_HEIGHT * ENTRY_SCALE));
 				int idx = firstVisible + row;
 				if (idx >= 0 && idx < file_count) {  /* tap a list row -> open it */
 					position = idx;

@@ -17,8 +17,10 @@
 
 #define MAX_FILES 1024
 
-#define FILES_PER_PAGE 10
+#define FILES_PER_PAGE 9
 #define ENTRY_SCALE .1f
+#define TOPBAR_H (FRAMEBUF_HEIGHT * 0.09f)   /* Home/Folders/Settings tab bar */
+#define LIST_Y0  TOPBAR_H                     /* the file list starts below the bar */
 
 #ifndef NDEBUG
 #define printf sceClibPrintf
