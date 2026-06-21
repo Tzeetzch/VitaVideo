@@ -33,7 +33,7 @@ mkdir -p "$BUILD/resources"
 # -fno-common, so restore the old behaviour rather than rewrite the headers.
 CFLAGS="-Wl,-q -O2 -std=c99 -DNDEBUG -fcommon -Isrc/include -Wno-format"
 SRCS="
-  src/main.c src/utils.c src/dir.c src/fs.c src/texture.c src/commonValues.c src/watchdb.c
+  src/main.c src/utils.c src/dir.c src/fs.c src/texture.c src/commonValues.c src/watchdb.c src/tent.c
   src/menus/menuMain.c src/menus/menuInfo.c
   src/avplayer/avsubs.c src/avplayer/avplayer.c src/avplayer/avsound.c
   src/avplayer/avplayerUtils.c src/avplayer/overlay.c
@@ -55,7 +55,7 @@ LIBS="
   -lSceGxm_stub -lSceCommonDialog_stub -lSceDisplay_stub -lSceSysmem_stub
   -lSceLibKernel_stub -lSceKernelThreadMgr_stub -lSceProcessmgr_stub
   -lSceCtrl_stub -lSceTouch_stub -lSceAudio_stub -lSceSysmodule_stub -lSceAppUtil_stub
-  -lSceAppMgr_stub -lSceAvPlayer_stub -lm
+  -lSceAppMgr_stub -lSceAvPlayer_stub -lScePower_stub -lSceAVConfig_stub -lm
 "
 echo ">> Compiling and linking..."
 $CC $CFLAGS $SRCS $RES_OBJS $LIBS -o "$BUILD/$OUT.elf"

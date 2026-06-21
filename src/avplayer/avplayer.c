@@ -6,6 +6,7 @@
 #include "overlay.h"
 #include "watchdb.h"
 #include "dir.h"
+#include "tent.h"
 #include <string.h>
 #include <display.h>
 #include <kernel.h>
@@ -124,17 +125,38 @@ static void handleAVPlayerControls()
 				sceAvPlayerJumpToTime(player, (uint64_t)(frac * streamDuration));
 				subReset = 1;
 			} else if (wasVisibleAtDown) {         /* a tap while the HUD was showing */
-				int inPlay = (downX > FRAMEBUF_WIDTH * 0.42f && downX < FRAMEBUF_WIDTH * 0.58f &&
-				              downY > FRAMEBUF_HEIGHT * 0.84f && downY < FRAMEBUF_HEIGHT * 0.97f);
-				if (inPlay) {
+				switch (overlayHitTest(downX, downY)) {
+				case HUD_HIT_PLAYPAUSE:
 					if (0 > sceAvPlayerPause(player)) {
 						sceAvPlayerResume(player);
 						sceKernelSetEventFlag(eventUid, OVERLAY_ACTIVE);
 					} else {
 						sceKernelSetEventFlag(eventUid, OVERLAY_PAUSED);
 					}
-				} else {
+					break;
+				case HUD_HIT_VOLDOWN:
+					avSoundSetVolume(avSoundGetVolume() - 10);
+					sceKernelSetEventFlag(eventUid, OVERLAY_ACTIVE);
+					break;
+				case HUD_HIT_VOLUP:
+					avSoundSetVolume(avSoundGetVolume() + 10);
+					sceKernelSetEventFlag(eventUid, OVERLAY_ACTIVE);
+					break;
+				case HUD_HIT_NEXT:
+					playNextRequested = 1;
+					sceAvPlayerStop(player);
+					break;
+				case HUD_HIT_SLEEP:
+					tentCycleSleep();
+					sceKernelSetEventFlag(eventUid, OVERLAY_ACTIVE);
+					break;
+				case HUD_HIT_DIM:
+					tentCycleBrightness();
+					sceKernelSetEventFlag(eventUid, OVERLAY_ACTIVE);
+					break;
+				default:
 					sceKernelSetEventFlag(eventUid, OVERLAY_CLOSED);   /* tap empty area = hide */
+					break;
 				}
 			}
 			/* (HUD was hidden -> the touch-down already showed it; nothing else) */
@@ -426,6 +448,10 @@ int startPlayback(char *filename)
 			if (playerTime > lastFlush + 15000 || lastFlush > playerTime + 15000) {
 				watchdbSave();
 				lastFlush = playerTime;
+			}
+			if (tentSleepExpired()) {       /* sleep timer fired -> stop and stay stopped */
+				tentCancelSleep();
+				sceAvPlayerStop(player);
 			}
 			sceDisplayWaitVblankStart();
 			vita2d_start_drawing();

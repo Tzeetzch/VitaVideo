@@ -6,6 +6,7 @@
 #include "texture.h"
 #include "main.h"
 #include "avplayer.h"
+#include "tent.h"
 #include <psp2/touch.h>
 
 unsigned int sceLibcHeapSize = 90*1024*1024;
@@ -30,11 +31,13 @@ int main()
      * Vita's native 960x544 framebuffer, so the vita2d_sys module load and
      * the 1080p resolution setters are no longer needed. */
     initVita2d();
+    tentInit();
     initAppUtil();
 	SCE_CTRL_ENTER = getEnterButton();
 	SCE_CTRL_CANCEL = getCancelButton();
     avPlayerInit();
     drawMainMenu();
+    tentRestoreBrightness();   /* don't leave the screen dimmed after exit */
     termAppUtil();
     vita2d_fini();
     freeTextures();
