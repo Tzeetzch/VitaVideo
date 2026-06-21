@@ -32,4 +32,8 @@ void watchdbUpdate(const char *path, uint64_t position, uint64_t duration);
 void watchdbSetLastPlayed(const char *path);
 const char *watchdbGetLastPlayed(void);
 
+/* Item-menu actions. */
+void watchdbClear(const char *path);       /* forget all progress for a file */
+void watchdbSetWatched(const char *path);  /* mark a file fully watched */
+
 #endif

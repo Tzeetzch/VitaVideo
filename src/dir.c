@@ -22,11 +22,21 @@ File *files = NULL;
 char continueTarget[512] = {0};   /* full path the Continue/Next action will play */
 char continueLabel[320] = {0};    /* on-screen hint, e.g. "Next: Ep02.mp4" */
 
-/* Tappable "Continue Watching" banner in the right-hand panel. */
+/* Tappable "Continue Watching" banner in the right-hand panel (Home tab uses
+ * its own card; the banner constants are kept for drawContinueBanner). */
 #define BANNER_X (FRAMEBUF_WIDTH  * 0.62f)
 #define BANNER_Y (FRAMEBUF_HEIGHT * 0.64f)
 #define BANNER_W (FRAMEBUF_WIDTH  * 0.34f)
 #define BANNER_H (FRAMEBUF_HEIGHT * 0.22f)
+
+/* Per-item action menu (right-hand panel) for the selected video. */
+#define IM_X   (FRAMEBUF_WIDTH  * 0.63f)
+#define IM_W   (FRAMEBUF_WIDTH  * 0.34f)
+#define IM_H   (FRAMEBUF_HEIGHT * 0.075f)
+#define IM_GAP (FRAMEBUF_HEIGHT * 0.085f)
+#define IM_Y0  (FRAMEBUF_HEIGHT * 0.58f)
+#define IM_BUTTONS 4
+static const char *imLabels[IM_BUTTONS] = { "Play", "Restart", "Mark watched", "Reset" };
 
 
 static void dirListFree(File *node) {
@@ -321,6 +331,18 @@ void drawContinueBanner(void) {
 		RGBA8(230, 230, 230, 255), bs * 0.8f, "tap to play");
 }
 
+/* Action menu in the right-hand panel for the selected video. */
+void drawItemMenu(void) {
+	File *sel = getFileIndex(position);
+	if (!sel || sel->is_dir || strncasecmp(sel->ext, "mp4", 4))
+		return;
+	for (int b = 0; b < IM_BUTTONS; b++) {
+		float by = IM_Y0 + b * IM_GAP;
+		vita2d_draw_rectangle(IM_X, by, IM_W, IM_H, RGBA8(55, 55, 60, 255));
+		vita2d_pgf_draw_text(pgf, IM_X + IM_W*0.10f, by + IM_H*0.64f, RGBA8(255, 255, 255, 255), 0.9f, imLabels[b]);
+	}
+}
+
 /* Play the Continue/Next target (used by the Home tab and the banner). */
 void playContinue(void) {
 	if (!continueTarget[0])
@@ -457,8 +479,8 @@ int getLastDirectory(void) {
 
 int handleDirControls()
 {
-	/* ---- Touchscreen: tap a row to open, tap the banner to continue,
-	   swipe up/down to scroll a page ---- */
+	/* ---- Touchscreen: tap a folder to open it / a video to select it,
+	   tap an action-menu button, swipe up/down to scroll a page ---- */
 	{
 		static int twas = 0, downX = 0, downY = 0, lastY = 0;
 		if (touchActive) {
@@ -473,22 +495,30 @@ int handleDirControls()
 					if (position < 0) position = 0;
 					if (position > file_count - 1) position = file_count - 1;
 				}
-			} else if (continueTarget[0] &&
-			           downX > BANNER_X && downX < BANNER_X + BANNER_W &&
-			           downY > BANNER_Y && downY < BANNER_Y + BANNER_H) {
-				startPlayback(continueTarget);       /* tap the Continue banner */
-				updateContinueTarget();
-				getDirListing(SCE_FALSE);
 			} else if (downX < FRAMEBUF_WIDTH * 0.6f && downY >= LIST_Y0 && file_count > 0) {
 				int firstVisible = (position < FILES_PER_PAGE) ? 0 : (position - FILES_PER_PAGE + 1);
 				int row = (int)((downY - LIST_Y0) / (FRAMEBUF_HEIGHT * ENTRY_SCALE));
 				int idx = firstVisible + row;
-				if (idx >= 0 && idx < file_count) {  /* tap a list row -> open it */
+				if (idx >= 0 && idx < file_count) {
 					position = idx;
 					File *sel = getFileIndex(position);
-					SceBool wasVideo = (sel && !sel->is_dir);
-					openFile();
-					if (wasVideo) {
+					if (sel && sel->is_dir) {        /* folder -> open immediately */
+						openFile();
+						getDirListing(SCE_FALSE);
+					}
+					/* video -> just selected; the action menu (right) handles it */
+				}
+			} else if (downX > IM_X && downX < IM_X + IM_W && downY >= IM_Y0 && file_count > 0) {
+				File *sel = getFileIndex(position);   /* action-menu button for the selected video */
+				if (sel && !sel->is_dir && !strncasecmp(sel->ext, "mp4", 4)) {
+					int b = (int)((downY - IM_Y0) / IM_GAP);
+					if (b >= 0 && b < IM_BUTTONS) {
+						char p[1024];
+						snprintf(p, sizeof(p), "%s%s", curDir, sel->name);
+						if (b == 0) startPlayback(p);                       /* Play (resumes) */
+						else if (b == 1) { watchdbClear(p); startPlayback(p); } /* Restart */
+						else if (b == 2) watchdbSetWatched(p);              /* Mark watched */
+						else if (b == 3) watchdbClear(p);                   /* Reset */
 						updateContinueTarget();
 						getDirListing(SCE_FALSE);
 					}

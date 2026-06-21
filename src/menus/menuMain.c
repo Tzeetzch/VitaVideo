@@ -154,7 +154,7 @@ int drawMainMenu()
 
         if (currentTab == TAB_FOLDERS) {
             displayFiles();
-            drawContinueBanner();
+            drawItemMenu();
         } else if (currentTab == TAB_HOME) {
             drawHome();
         } else {

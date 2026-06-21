@@ -111,6 +111,38 @@ const char *watchdbGetLastPlayed(void) {
 	return lastPlayed;
 }
 
+void watchdbClear(const char *path) {
+	WatchEntry **pp = &dbHead;
+	while (*pp) {
+		if (!strcmp((*pp)->path, path)) {
+			WatchEntry *dead = *pp;
+			*pp = dead->next;
+			free(dead);
+			watchdbSave();
+			return;
+		}
+		pp = &(*pp)->next;
+	}
+}
+
+void watchdbSetWatched(const char *path) {
+	if (!path || !path[0] || strlen(path) >= sizeof(((WatchEntry*)0)->path))
+		return;
+	WatchEntry *e = findEntry(path);
+	if (!e) {
+		e = malloc(sizeof(WatchEntry));
+		if (!e)
+			return;
+		strcpy(e->path, path);
+		e->duration = 0;
+		e->next = dbHead;
+		dbHead = e;
+	}
+	e->state = WATCH_WATCHED;
+	e->position = 0;
+	watchdbSave();
+}
+
 void watchdbSave(void) {
 	SceUID fd = sceIoOpen(WATCHDB_PATH, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
 	if (fd < 0)
