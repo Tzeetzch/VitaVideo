@@ -38,6 +38,16 @@ char continueLabel[320] = {0};    /* on-screen hint, e.g. "Next: Ep02.mp4" */
 #define IM_BUTTONS 4
 static const char *imLabels[IM_BUTTONS] = { "Play", "Restart", "Mark watched", "Reset" };
 
+/* Favourite folders + the "favorite this folder" button (right panel). */
+#define MAX_FAVS 12
+#define FAVS_PATH "ux0:data/SubPlayer/favorites.txt"
+static char favs[MAX_FAVS][1024];
+static int favCount = 0;
+#define FAVBTN_X (FRAMEBUF_WIDTH  * 0.63f)
+#define FAVBTN_Y (FRAMEBUF_HEIGHT * 0.41f)
+#define FAVBTN_W (FRAMEBUF_WIDTH  * 0.34f)
+#define FAVBTN_H (FRAMEBUF_HEIGHT * 0.07f)
+
 
 static void dirListFree(File *node) {
 	if (node == NULL) // End of list
@@ -333,6 +343,11 @@ void drawContinueBanner(void) {
 
 /* Action menu in the right-hand panel for the selected video. */
 void drawItemMenu(void) {
+	if (curDir[0]) {   /* favorite-this-folder toggle (not at the device root) */
+		vita2d_draw_rectangle(FAVBTN_X, FAVBTN_Y, FAVBTN_W, FAVBTN_H, RGBA8(70, 60, 40, 255));
+		vita2d_pgf_draw_text(pgf, FAVBTN_X + FAVBTN_W*0.08f, FAVBTN_Y + FAVBTN_H*0.62f,
+			RGBA8(255, 220, 120, 255), 0.85f, favIsFav(curDir) ? "Unfavorite folder" : "Favorite folder");
+	}
 	File *sel = getFileIndex(position);
 	if (!sel || sel->is_dir || strncasecmp(sel->ext, "mp4", 4))
 		return;
@@ -373,6 +388,95 @@ int getSortOrder(void) { return config; }
 void setSortOrder(int s) {
 	if (s < 0) s = 0;
 	config = s % 4;
+}
+
+void favLoad(void) {
+	favCount = 0;
+	SceUID fd = sceIoOpen(FAVS_PATH, SCE_O_RDONLY, 0);
+	if (fd < 0)
+		return;
+	SceOff size = sceIoLseek(fd, 0, SCE_SEEK_END);
+	sceIoLseek(fd, 0, SCE_SEEK_SET);
+	if (size <= 0) { sceIoClose(fd); return; }
+	char *buf = malloc(size + 1);
+	if (!buf) { sceIoClose(fd); return; }
+	int rd = sceIoRead(fd, buf, size);
+	sceIoClose(fd);
+	if (rd <= 0) { free(buf); return; }
+	buf[rd] = '\0';
+	char *line = buf;
+	while (line && *line && favCount < MAX_FAVS) {
+		char *nl = strchr(line, '\n');
+		if (nl) *nl = '\0';
+		size_t len = strlen(line);
+		while (len && (line[len-1] == '\r' || line[len-1] == ' ')) line[--len] = '\0';
+		if (len > 0 && len < sizeof(favs[0]))
+			strcpy(favs[favCount++], line);
+		if (!nl) break;
+		line = nl + 1;
+	}
+	free(buf);
+}
+
+static void favSave(void) {
+	SceUID fd = sceIoOpen(FAVS_PATH, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+	if (fd < 0)
+		return;
+	for (int i = 0; i < favCount; i++) {
+		sceIoWrite(fd, favs[i], strlen(favs[i]));
+		sceIoWrite(fd, "\n", 1);
+	}
+	sceIoClose(fd);
+}
+
+int favCountGet(void) { return favCount; }
+const char *favGet(int i) { return (i >= 0 && i < favCount) ? favs[i] : ""; }
+
+int favIsFav(const char *path) {
+	for (int i = 0; i < favCount; i++)
+		if (!strcmp(favs[i], path))
+			return 1;
+	return 0;
+}
+
+void favToggle(const char *path) {
+	if (!path || !path[0] || strlen(path) >= sizeof(favs[0]))
+		return;
+	for (int i = 0; i < favCount; i++) {
+		if (!strcmp(favs[i], path)) {           /* already a favourite -> remove */
+			for (int j = i; j < favCount - 1; j++)
+				strcpy(favs[j], favs[j + 1]);
+			favCount--;
+			favSave();
+			return;
+		}
+	}
+	if (favCount < MAX_FAVS) {
+		strcpy(favs[favCount++], path);
+		favSave();
+	}
+}
+
+/* Jump to a folder (from a Home favourite tile). */
+void openFolder(const char *path) {
+	if (!path || !path[0])
+		return;
+	strncpy(curDir, path, 511);
+	curDir[511] = '\0';
+	getDirListing(SCE_TRUE);
+	saveLastDirectory();
+}
+
+/* Play an arbitrary path (from a Home recent row). */
+void playPath(const char *path) {
+	if (!path || !path[0])
+		return;
+	char p[1024];
+	strncpy(p, path, sizeof(p) - 1);
+	p[sizeof(p) - 1] = '\0';
+	startPlayback(p);
+	updateContinueTarget();
+	getDirListing(SCE_FALSE);
 }
 
 File *getFileIndex(int index) {
@@ -515,6 +619,9 @@ int handleDirControls()
 					}
 					/* video -> just selected; the action menu (right) handles it */
 				}
+			} else if (curDir[0] && downX > FAVBTN_X && downX < FAVBTN_X + FAVBTN_W &&
+			           downY > FAVBTN_Y && downY < FAVBTN_Y + FAVBTN_H) {
+				favToggle(curDir);                    /* favorite/unfavorite this folder */
 			} else if (downX > IM_X && downX < IM_X + IM_W && downY >= IM_Y0 && file_count > 0) {
 				File *sel = getFileIndex(position);   /* action-menu button for the selected video */
 				if (sel && !sel->is_dir && !strncasecmp(sel->ext, "mp4", 4)) {

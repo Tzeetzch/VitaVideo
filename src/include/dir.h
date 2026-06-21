@@ -21,6 +21,13 @@ void cycleSortOrder(void);
 const char *sortOrderName(void);
 int getSortOrder(void);
 void setSortOrder(int s);
+void favLoad(void);
+int favCountGet(void);
+const char *favGet(int i);
+int favIsFav(const char *path);
+void favToggle(const char *path);
+void openFolder(const char *path);
+void playPath(const char *path);
 int findNextEpisode(const char *lastPath, char *out, int outSize);
 File *getFileIndex(int index);
 

@@ -7,6 +7,8 @@
 
 #define WATCHDB_PATH "ux0:data/SubPlayer/watched.db"
 #define LASTPLAYED_PATH "ux0:data/SubPlayer/lastplayed.txt"
+#define RECENT_PATH "ux0:data/SubPlayer/recent.txt"
+#define MAX_RECENT 8
 #define RESUME_MIN_MS   5000   /* don't bother resuming the first few seconds */
 #define WATCHED_PCT_NUM 9      /* >= 90% counts as finished */
 #define WATCHED_PCT_DEN 10
@@ -21,6 +23,65 @@ typedef struct WatchEntry {
 
 static WatchEntry *dbHead = NULL;
 static char lastPlayed[1024] = {0};
+static char recent[MAX_RECENT][1024];
+static int recentCount = 0;
+
+static void recentSave(void) {
+	SceUID fd = sceIoOpen(RECENT_PATH, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+	if (fd < 0)
+		return;
+	for (int i = 0; i < recentCount; i++) {
+		sceIoWrite(fd, recent[i], strlen(recent[i]));
+		sceIoWrite(fd, "\n", 1);
+	}
+	sceIoClose(fd);
+}
+
+static void recentLoad(void) {
+	recentCount = 0;
+	SceUID fd = sceIoOpen(RECENT_PATH, SCE_O_RDONLY, 0);
+	if (fd < 0)
+		return;
+	SceOff size = sceIoLseek(fd, 0, SCE_SEEK_END);
+	sceIoLseek(fd, 0, SCE_SEEK_SET);
+	if (size <= 0) { sceIoClose(fd); return; }
+	char *buf = malloc(size + 1);
+	if (!buf) { sceIoClose(fd); return; }
+	int rd = sceIoRead(fd, buf, size);
+	sceIoClose(fd);
+	if (rd <= 0) { free(buf); return; }
+	buf[rd] = '\0';
+	char *line = buf;
+	while (line && *line && recentCount < MAX_RECENT) {
+		char *nl = strchr(line, '\n');
+		if (nl) *nl = '\0';
+		size_t len = strlen(line);
+		while (len && (line[len-1] == '\r' || line[len-1] == ' ')) line[--len] = '\0';
+		if (len > 0 && len < sizeof(recent[0]))
+			strcpy(recent[recentCount++], line);
+		if (!nl) break;
+		line = nl + 1;
+	}
+	free(buf);
+}
+
+static void recentPush(const char *path) {
+	if (!path || !path[0] || strlen(path) >= sizeof(recent[0]))
+		return;
+	char tmp[MAX_RECENT][1024];
+	int c = 0;
+	strcpy(tmp[c++], path);                       /* newest first */
+	for (int i = 0; i < recentCount && c < MAX_RECENT; i++)
+		if (strcmp(recent[i], path))              /* drop the duplicate */
+			strcpy(tmp[c++], recent[i]);
+	recentCount = c;
+	for (int i = 0; i < c; i++)
+		strcpy(recent[i], tmp[i]);
+	recentSave();
+}
+
+int watchdbRecentCount(void) { return recentCount; }
+const char *watchdbRecentGet(int i) { return (i >= 0 && i < recentCount) ? recent[i] : ""; }
 
 static WatchEntry *findEntry(const char *path) {
 	for (WatchEntry *e = dbHead; e != NULL; e = e->next)
@@ -94,6 +155,8 @@ void watchdbLoad(void) {
 		while (n > 0 && (lastPlayed[n-1] == '\n' || lastPlayed[n-1] == '\r' || lastPlayed[n-1] == ' '))
 			lastPlayed[--n] = '\0';
 	}
+
+	recentLoad();
 }
 
 void watchdbSetLastPlayed(const char *path) {
@@ -105,6 +168,7 @@ void watchdbSetLastPlayed(const char *path) {
 		sceIoWrite(fd, lastPlayed, strlen(lastPlayed));
 		sceIoClose(fd);
 	}
+	recentPush(path);
 }
 
 const char *watchdbGetLastPlayed(void) {

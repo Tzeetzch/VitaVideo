@@ -36,4 +36,8 @@ const char *watchdbGetLastPlayed(void);
 void watchdbClear(const char *path);       /* forget all progress for a file */
 void watchdbSetWatched(const char *path);  /* mark a file fully watched */
 
+/* Recently-watched list (newest first). */
+int watchdbRecentCount(void);
+const char *watchdbRecentGet(int i);
+
 #endif

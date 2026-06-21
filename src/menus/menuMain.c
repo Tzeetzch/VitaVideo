@@ -10,11 +10,31 @@
 
 static int currentTab = TAB_FOLDERS;
 
-/* Home "Continue Watching" card */
-#define HOME_CARD_X (FRAMEBUF_WIDTH  * 0.15f)
-#define HOME_CARD_Y (FRAMEBUF_HEIGHT * 0.38f)
-#define HOME_CARD_W (FRAMEBUF_WIDTH  * 0.70f)
-#define HOME_CARD_H (FRAMEBUF_HEIGHT * 0.28f)
+/* Home: continue card on top, Favorites + Recently-watched columns below */
+#define HOME_CARD_X (FRAMEBUF_WIDTH  * 0.05f)
+#define HOME_CARD_Y (TOPBAR_H + FRAMEBUF_HEIGHT * 0.06f)
+#define HOME_CARD_W (FRAMEBUF_WIDTH  * 0.90f)
+#define HOME_CARD_H (FRAMEBUF_HEIGHT * 0.16f)
+#define HOME_LIST_Y (TOPBAR_H + FRAMEBUF_HEIGHT * 0.32f)
+#define HOME_ROW_H  (FRAMEBUF_HEIGHT * 0.10f)
+#define HOME_ROWS   5
+#define FAV_COL_X   (FRAMEBUF_WIDTH  * 0.05f)
+#define FAV_COL_W   (FRAMEBUF_WIDTH  * 0.43f)
+#define REC_COL_X   (FRAMEBUF_WIDTH  * 0.52f)
+#define REC_COL_W   (FRAMEBUF_WIDTH  * 0.43f)
+
+/* Last path component (handles a trailing '/' on folder paths). */
+static void folderName(const char *p, char *out, int sz) {
+    int len = strlen(p);
+    if (len > 0 && p[len-1] == '/') len--;
+    int start = len;
+    while (start > 0 && p[start-1] != '/') start--;
+    int n = len - start;
+    if (n >= sz) n = sz - 1;
+    if (n < 0) n = 0;
+    memcpy(out, p + start, n);
+    out[n] = '\0';
+}
 
 /* Settings tappable rows */
 #define SET_ROW_X  (FRAMEBUF_WIDTH  * 0.10f)
@@ -32,6 +52,7 @@ int initMainMenu()
     subtitleFont = vita2d_load_custom_pvf("app0:OpenSans-Bold.ttf");
     watchdbLoad();
     configLoad();                 /* restore sort / brightness / default-sleep */
+    favLoad();
     getLastDirectory();
     getDirListing(SCE_FALSE);
     updateContinueTarget();
@@ -56,18 +77,45 @@ static void drawTopBar(void)
 
 static void drawHome(void)
 {
-    vita2d_pgf_draw_text(pgf, FRAMEBUF_WIDTH*0.08f, TOPBAR_H + FRAMEBUF_HEIGHT*0.14f,
-        RGBA8(230, 230, 230, 255), 1.1f, "Continue Watching");
+    char nm[256];
+
+    /* Continue Watching card */
+    vita2d_pgf_draw_text(pgf, HOME_CARD_X, TOPBAR_H + FRAMEBUF_HEIGHT*0.045f,
+        RGBA8(230, 230, 230, 255), 1.0f, "Continue Watching");
     if (continueLabel[0]) {
         vita2d_draw_rectangle(HOME_CARD_X, HOME_CARD_Y, HOME_CARD_W, HOME_CARD_H, RGBA8(120, 120, 255, 180));
-        vita2d_pgf_draw_text(pgf, HOME_CARD_X + FRAMEBUF_WIDTH*0.03f, HOME_CARD_Y + HOME_CARD_H*0.45f,
+        vita2d_pgf_draw_text(pgf, HOME_CARD_X + FRAMEBUF_WIDTH*0.02f, HOME_CARD_Y + HOME_CARD_H*0.45f,
             RGBA8(255, 255, 255, 255), 1.0f, continueLabel);
-        vita2d_pgf_draw_text(pgf, HOME_CARD_X + FRAMEBUF_WIDTH*0.03f, HOME_CARD_Y + HOME_CARD_H*0.78f,
-            RGBA8(235, 235, 235, 255), 0.9f, "tap to play");
+        vita2d_pgf_draw_text(pgf, HOME_CARD_X + FRAMEBUF_WIDTH*0.02f, HOME_CARD_Y + HOME_CARD_H*0.80f,
+            RGBA8(235, 235, 235, 255), 0.85f, "tap to play");
     } else {
         vita2d_pgf_draw_text(pgf, HOME_CARD_X, HOME_CARD_Y + HOME_CARD_H*0.5f,
-            RGBA8(170, 170, 170, 255), 1.0f, "Nothing in progress - open the Folders tab");
+            RGBA8(170, 170, 170, 255), 0.95f, "Nothing in progress yet");
     }
+
+    /* Favorites column */
+    vita2d_pgf_draw_text(pgf, FAV_COL_X, HOME_LIST_Y - FRAMEBUF_HEIGHT*0.02f, RGBA8(230, 230, 230, 255), 0.95f, "Favorites");
+    int fc = favCountGet(); if (fc > HOME_ROWS) fc = HOME_ROWS;
+    for (int i = 0; i < fc; i++) {
+        float ry = HOME_LIST_Y + i * HOME_ROW_H;
+        vita2d_draw_rectangle(FAV_COL_X, ry, FAV_COL_W, HOME_ROW_H * 0.86f, RGBA8(55, 55, 60, 255));
+        folderName(favGet(i), nm, sizeof(nm));
+        vita2d_pgf_draw_text(pgf, FAV_COL_X + FRAMEBUF_WIDTH*0.015f, ry + HOME_ROW_H*0.55f, RGBA8(255, 255, 255, 255), 0.85f, nm);
+    }
+    if (favCountGet() == 0)
+        vita2d_pgf_draw_text(pgf, FAV_COL_X, HOME_LIST_Y + HOME_ROW_H*0.6f, RGBA8(150, 150, 150, 255), 0.8f, "(star a folder in Folders)");
+
+    /* Recently watched column */
+    vita2d_pgf_draw_text(pgf, REC_COL_X, HOME_LIST_Y - FRAMEBUF_HEIGHT*0.02f, RGBA8(230, 230, 230, 255), 0.95f, "Recently watched");
+    int rc = watchdbRecentCount(); if (rc > HOME_ROWS) rc = HOME_ROWS;
+    for (int i = 0; i < rc; i++) {
+        float ry = HOME_LIST_Y + i * HOME_ROW_H;
+        vita2d_draw_rectangle(REC_COL_X, ry, REC_COL_W, HOME_ROW_H * 0.86f, RGBA8(55, 55, 60, 255));
+        folderName(watchdbRecentGet(i), nm, sizeof(nm));
+        vita2d_pgf_draw_text(pgf, REC_COL_X + FRAMEBUF_WIDTH*0.015f, ry + HOME_ROW_H*0.55f, RGBA8(255, 255, 255, 255), 0.85f, nm);
+    }
+    if (watchdbRecentCount() == 0)
+        vita2d_pgf_draw_text(pgf, REC_COL_X, HOME_LIST_Y + HOME_ROW_H*0.6f, RGBA8(150, 150, 150, 255), 0.8f, "(nothing yet)");
 }
 
 static void drawSettings(void)
@@ -126,10 +174,22 @@ static void handleHome(void)
         lastY = touchY;
     } else if (twas) {
         int dy = lastY - downY; if (dy < 0) dy = -dy;
-        if (dy < (int)TAP_MAX_MOVE && downY >= (int)TOPBAR_H && continueLabel[0] &&
-            downX > HOME_CARD_X && downX < HOME_CARD_X + HOME_CARD_W &&
-            downY > HOME_CARD_Y && downY < HOME_CARD_Y + HOME_CARD_H) {
-            playContinue();
+        if (dy < (int)TAP_MAX_MOVE && downY >= (int)TOPBAR_H) {
+            if (continueLabel[0] &&
+                downX > HOME_CARD_X && downX < HOME_CARD_X + HOME_CARD_W &&
+                downY > HOME_CARD_Y && downY < HOME_CARD_Y + HOME_CARD_H) {
+                playContinue();
+            } else if (downX > FAV_COL_X && downX < FAV_COL_X + FAV_COL_W && downY >= HOME_LIST_Y) {
+                int i = (int)((downY - HOME_LIST_Y) / HOME_ROW_H);
+                if (i >= 0 && i < HOME_ROWS && i < favCountGet()) {
+                    openFolder(favGet(i));      /* jump to the favourite folder */
+                    currentTab = TAB_FOLDERS;
+                }
+            } else if (downX > REC_COL_X && downX < REC_COL_X + REC_COL_W && downY >= HOME_LIST_Y) {
+                int i = (int)((downY - HOME_LIST_Y) / HOME_ROW_H);
+                if (i >= 0 && i < HOME_ROWS && i < watchdbRecentCount())
+                    playPath(watchdbRecentGet(i));   /* replay a recent video */
+            }
         }
     }
     twas = touchActive;
