@@ -22,6 +22,9 @@ uint64_t watchdbGetResume(const char *path);
 /* WATCH_UNWATCHED / WATCH_INPROGRESS / WATCH_WATCHED for a file. */
 int watchdbGetState(const char *path);
 
+/* Watched fraction 0..100, or -1 if the file is unknown. */
+int watchdbGetProgress(const char *path);
+
 /* Record current playback position; auto-marks WATCHED once near the end. */
 void watchdbUpdate(const char *path, uint64_t position, uint64_t duration);
 

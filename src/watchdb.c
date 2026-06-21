@@ -141,6 +141,21 @@ int watchdbGetState(const char *path) {
 	return e ? e->state : WATCH_UNWATCHED;
 }
 
+int watchdbGetProgress(const char *path) {
+	WatchEntry *e = findEntry(path);
+	if (!e)
+		return -1;
+	if (e->state == WATCH_WATCHED)
+		return 100;
+	if (e->duration > 0) {
+		int p = (int)((e->position * 100) / e->duration);
+		if (p < 0) p = 0;
+		if (p > 100) p = 100;
+		return p;
+	}
+	return 0;   /* known but no duration yet -> just started */
+}
+
 void watchdbUpdate(const char *path, uint64_t position, uint64_t duration) {
 	if (!path || !path[0] || strlen(path) >= sizeof(((WatchEntry*)0)->path))
 		return;

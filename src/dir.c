@@ -22,6 +22,12 @@ File *files = NULL;
 char continueTarget[512] = {0};   /* full path the Continue/Next action will play */
 char continueLabel[320] = {0};    /* on-screen hint, e.g. "Next: Ep02.mp4" */
 
+/* Tappable "Continue Watching" banner in the right-hand panel. */
+#define BANNER_X (FRAMEBUF_WIDTH  * 0.62f)
+#define BANNER_Y (FRAMEBUF_HEIGHT * 0.64f)
+#define BANNER_W (FRAMEBUF_WIDTH  * 0.34f)
+#define BANNER_H (FRAMEBUF_HEIGHT * 0.22f)
+
 
 static void dirListFree(File *node) {
 	if (node == NULL) // End of list
@@ -280,16 +286,19 @@ void displayFiles() {
 			else
 				vita2d_pgf_draw_text(pgf, startXScale, (FRAMEBUF_HEIGHT*ENTRY_SCALE/2.0f) + (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed), RGBA8(255, 255, 255, 255), basePgfScale*.9f, file->name);
 
-			// Watched / in-progress dot for video files (green = watched, orange = partway)
+			// Per-item watch progress bar for videos (green = finished, orange = partway)
 			if (!file->is_dir && !strncasecmp(file->ext, "mp4", 4)) {
 				char fullPath[512];
 				snprintf(fullPath, sizeof(fullPath), "%s%s", curDir, file->name);
-				int watchState = watchdbGetState(fullPath);
-				if (watchState != WATCH_UNWATCHED) {
-					float dotSize = FRAMEBUF_HEIGHT*ENTRY_SCALE*0.28f;
-					float dotY = (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed) + (FRAMEBUF_HEIGHT*ENTRY_SCALE - dotSize)/2.0f;
-					unsigned int dotColor = (watchState == WATCH_WATCHED) ? RGBA8(40, 200, 40, 255) : RGBA8(255, 170, 0, 255);
-					vita2d_draw_rectangle(FRAMEBUF_WIDTH*0.022f, dotY, dotSize, dotSize, dotColor);
+				int prog = watchdbGetProgress(fullPath);
+				if (prog >= 0) {
+					float barH = FRAMEBUF_HEIGHT * 0.010f;
+					float barY = (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed) + FRAMEBUF_HEIGHT*ENTRY_SCALE - barH - FRAMEBUF_HEIGHT*0.012f;
+					float barX = startXScale;
+					float trackW = FRAMEBUF_WIDTH * 0.5f;
+					unsigned int fillC = (prog >= 100) ? RGBA8(40, 200, 40, 255) : RGBA8(255, 170, 0, 255);
+					vita2d_draw_rectangle(barX, barY, trackW, barH, RGBA8(80, 80, 80, 220));
+					vita2d_draw_rectangle(barX, barY, trackW * (prog / 100.0f), barH, fillC);
 				}
 			}
 
@@ -299,6 +308,17 @@ void displayFiles() {
 		i++;
 	}
 	vita2d_draw_line(FRAMEBUF_WIDTH*0.6f,0,FRAMEBUF_WIDTH*0.6f,FRAMEBUF_HEIGHT, RGBA8(255, 255, 255, 255));
+}
+
+void drawContinueBanner(void) {
+	if (!continueLabel[0])
+		return;
+	float bs = FRAMEBUF_HEIGHT / 544.0f;
+	vita2d_draw_rectangle(BANNER_X, BANNER_Y, BANNER_W, BANNER_H, RGBA8(120, 120, 255, 180));
+	vita2d_pgf_draw_text(pgf, BANNER_X + FRAMEBUF_WIDTH*0.015f, BANNER_Y + FRAMEBUF_HEIGHT*0.07f,
+		RGBA8(255, 255, 255, 255), bs * 0.8f, continueLabel);
+	vita2d_pgf_draw_text(pgf, BANNER_X + FRAMEBUF_WIDTH*0.015f, BANNER_Y + FRAMEBUF_HEIGHT*0.16f,
+		RGBA8(230, 230, 230, 255), bs * 0.8f, "tap to play");
 }
 
 File *getFileIndex(int index) {
@@ -412,6 +432,47 @@ int getLastDirectory(void) {
 
 int handleDirControls()
 {
+	/* ---- Touchscreen: tap a row to open, tap the banner to continue,
+	   swipe up/down to scroll a page ---- */
+	{
+		static int twas = 0, downX = 0, downY = 0, lastY = 0;
+		if (touchActive) {
+			if (!twas) { downX = touchX; downY = touchY; }
+			lastY = touchY;
+		} else if (twas) {
+			int dy = lastY - downY;
+			int adyAbs = (dy < 0) ? -dy : dy;
+			if (adyAbs > (int)(FRAMEBUF_HEIGHT * 0.12f)) {
+				if (file_count > 0) {                /* swipe -> page scroll */
+					position += (dy < 0) ? FILES_PER_PAGE : -FILES_PER_PAGE;
+					if (position < 0) position = 0;
+					if (position > file_count - 1) position = file_count - 1;
+				}
+			} else if (continueTarget[0] &&
+			           downX > BANNER_X && downX < BANNER_X + BANNER_W &&
+			           downY > BANNER_Y && downY < BANNER_Y + BANNER_H) {
+				startPlayback(continueTarget);       /* tap the Continue banner */
+				updateContinueTarget();
+				getDirListing(SCE_FALSE);
+			} else if (downX < FRAMEBUF_WIDTH * 0.6f && file_count > 0) {
+				int firstVisible = (position < FILES_PER_PAGE) ? 0 : (position - FILES_PER_PAGE + 1);
+				int row = (int)(downY / (FRAMEBUF_HEIGHT * ENTRY_SCALE));
+				int idx = firstVisible + row;
+				if (idx >= 0 && idx < file_count) {  /* tap a list row -> open it */
+					position = idx;
+					File *sel = getFileIndex(position);
+					SceBool wasVideo = (sel && !sel->is_dir);
+					openFile();
+					if (wasVideo) {
+						updateContinueTarget();
+						getDirListing(SCE_FALSE);
+					}
+				}
+			}
+		}
+		twas = touchActive;
+	}
+
 	if (file_count > 0) {
 		if (pressed & SCE_CTRL_UP)
 			position--;
