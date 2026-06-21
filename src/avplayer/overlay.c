@@ -37,7 +37,7 @@ static int drawStatus()
 
 int drawOverlay(uint64_t currentTime)
 {
-    float percentageDone = currentTime/(float)streamDuration;
+    float percentageDone = streamDuration ? currentTime/(float)streamDuration : 0.0f;
     vita2d_draw_rectangle(0,0,FRAMEBUF_WIDTH,FRAMEBUF_HEIGHT,RGBA8(0,0,0,120));
     vita2d_draw_rectangle(FRAMEBUF_WIDTH*.12f,FRAMEBUF_HEIGHT*.8f,FRAMEBUF_WIDTH*.76f, FRAMEBUF_HEIGHT*.027f, RGBA8(255,255,255,255));
     vita2d_draw_rectangle(FRAMEBUF_WIDTH*.12f,FRAMEBUF_HEIGHT*.8f,(FRAMEBUF_WIDTH*.76f)*percentageDone,FRAMEBUF_HEIGHT*.027f, RGBA8(120, 120, 255, 200));

@@ -4,6 +4,7 @@
 #include "common.h"
 #include "texture.h"
 #include "overlay.h"
+#include "watchdb.h"
 #include <string.h>
 #include <display.h>
 #include <kernel.h>
@@ -83,6 +84,12 @@ static void handleAVPlayerControls()
 
 int avPlayerInit()
 {
+	/* ReAvPlayer (MIT, prebuilt in modules/) hooks the SceAvcodec decode path
+	 * and patches SceAvPlayer. The original app depends on it for decode, not
+	 * just for 1080p, so it is loaded here exactly as upstream did. It also
+	 * loads the stock SceAvPlayer sysmodule internally (see its module_start).
+	 * Requires an "unsafe" eboot (full permissions) + taiHEN, both present on
+	 * a HENkaku/Enso console. */
 	int status = 0;
 	int ret = sceKernelLoadStartModule("app0:/modules/reAvPlayer.suprx", sizeof(int), &buffering_skip, 0, NULL, &status);
 	printf("## Start RE AV Player Module: %d\n", ret);
@@ -291,7 +298,7 @@ static int drawLoading()
 	vita2d_clear_screen();
 	vita2d_draw_texture_scale_rotate(loading, (FRAMEBUF_WIDTH/2.0f), (FRAMEBUF_HEIGHT/2.0f), scale, scale, rad);
 	vita2d_end_drawing();
-	vita2d_end_shfb();
+	vita2d_swap_buffers();
 	return 0;
 }
 
@@ -327,6 +334,13 @@ int startPlayback(char *filename)
     }
     else if (playerStatus == PLAYER_READY){
     	sceAvPlayerSetLooping(player, SCE_FALSE);
+    	/* Resume where the user last stopped this file (0 = play from start). */
+    	uint64_t resumeMs = watchdbGetResume(filename);
+    	if (resumeMs > 0) {
+    		sceAvPlayerJumpToTime(player, resumeMs);
+    		subReset = 1;
+    	}
+    	uint64_t lastFlush = resumeMs;
 		audioThreadId = sceKernelCreateThread("AudioOutput", audioOutThread, 0x10000100, 0x4000, 0, 0, NULL);
     	sceKernelStartThread(audioThreadId, 0, NULL);
 		timerThreadId = sceKernelCreateThread("OverlayThread", timerThread, 0x10000100, 0x4000, 0, 0, NULL);
@@ -336,6 +350,13 @@ int startPlayback(char *filename)
         memset(&videoFrame, 0, sizeof(SceAvPlayerFrameInfo));
         while (sceAvPlayerIsActive(player)) {
 			playerTime = sceAvPlayerCurrentTime(player);
+			/* Track progress in memory every frame; flush to disk every ~15s
+			 * (or after a backward seek) so resume survives a power-off. */
+			watchdbUpdate(filename, playerTime, streamDuration);
+			if (playerTime > lastFlush + 15000 || lastFlush > playerTime + 15000) {
+				watchdbSave();
+				lastFlush = playerTime;
+			}
 			sceDisplayWaitVblankStart();
 			vita2d_start_drawing();
 			vita2d_clear_screen();
@@ -348,10 +369,13 @@ int startPlayback(char *filename)
 				drawOverlay(sceAvPlayerCurrentTime(player));
 			vita2d_end_drawing();
 			vita2d_wait_rendering_done();
-			vita2d_end_shfb();
+			vita2d_swap_buffers();
             readControls();
             handleAVPlayerControls();
         }
+        /* Persist final position (marks WATCHED if we reached the end). */
+        watchdbUpdate(filename, playerTime, streamDuration);
+        watchdbSave();
     }
     sceAvPlayerClose(player);
 	printf("Freeing?\n\n");

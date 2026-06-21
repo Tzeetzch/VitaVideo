@@ -11,9 +11,7 @@ unsigned int sceLibcHeapSize = 90*1024*1024;
 
 int initVita2d()
 {
-    vita2d_init_param params;
-    memset(&params, 0, sizeof(vita2d_init_param));
-    vita2d_init(&params);
+    vita2d_init();
     printf("Init\n");
     vita2d_set_clear_color(RGBA8(0, 0, 0, 255));
     initMainMenu();
@@ -25,9 +23,9 @@ int main()
 {
     sceKernelPowerTick(SCE_KERNEL_POWER_TICK_DISABLE_AUTO_SUSPEND);
     sceIoMkdir("ux0:data/SubPlayer", 0777);
-    sceKernelLoadStartModule("app0:modules/libvita2d_sys.suprx", 0, SCE_NULL, 0, SCE_NULL, SCE_NULL);
-    vita2d_display_set_max_resolution(FRAMEBUF_WIDTH, FRAMEBUF_HEIGHT);
-    vita2d_display_set_resolution(FRAMEBUF_WIDTH, FRAMEBUF_HEIGHT);
+    /* Standard open-source vita2d is statically linked and fixed at the
+     * Vita's native 960x544 framebuffer, so the vita2d_sys module load and
+     * the 1080p resolution setters are no longer needed. */
     initVita2d();
     initAppUtil();
 	SCE_CTRL_ENTER = getEnterButton();

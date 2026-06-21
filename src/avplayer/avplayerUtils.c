@@ -87,7 +87,7 @@ void* AllocateTexture(void* jumpback, uint32_t alignment, uint32_t size)
 
 	return avTextureAlloc(
 #ifdef _USE_CDRAM
-						SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RWDATA,
+						SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,
 #else
 						SCE_KERNEL_MEMBLOCK_TYPE_USER_MAIN_PHYCONT_NC_RW,
 #endif

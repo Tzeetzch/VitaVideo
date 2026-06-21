@@ -27,7 +27,8 @@ extern SceUChar8 _binary_resources_loading_png_size;
 
 
 static vita2d_texture *Texture_LoadImageBilinear(ScePVoid buffer, unsigned long size) {
-	vita2d_texture *texture = vita2d_load_PNG_buffer(buffer, size);
+	(void)size; /* plain vita2d reads the dimensions from the PNG header */
+	vita2d_texture *texture = vita2d_load_PNG_buffer(buffer);
 	vita2d_texture_set_filters(texture, SCE_GXM_TEXTURE_FILTER_LINEAR, SCE_GXM_TEXTURE_FILTER_LINEAR);
 	return texture;
 }

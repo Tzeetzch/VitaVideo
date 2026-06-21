@@ -3,11 +3,13 @@
 #include "utils.h"
 #include "dir.h"
 #include "avsound.h"
+#include "watchdb.h"
 
 int initMainMenu()
 {
     pgf = vita2d_load_default_pgf();
-    subtitleFont = vita2d_load_custom_pvf("app0:OpenSans-Bold.ttf", (FRAMEBUF_HEIGHT*0.0290f), (FRAMEBUF_HEIGHT*0.0290f));
+    subtitleFont = vita2d_load_custom_pvf("app0:OpenSans-Bold.ttf");
+    watchdbLoad();
     getLastDirectory();
     getDirListing(SCE_FALSE);
     avSoundInit();
@@ -24,7 +26,7 @@ int drawMainMenu()
         displayFiles();
         vita2d_end_drawing();
         vita2d_wait_rendering_done();
-		vita2d_end_shfb();
+		vita2d_swap_buffers();
         readControls();
         handleDirControls();
 

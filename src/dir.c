@@ -9,8 +9,11 @@
 #include "utils.h"
 #include "fs.h"
 #include "texture.h"
+#include "watchdb.h"
 
+#ifndef SCE_S_ISDIR
 #define 	SCE_S_ISDIR(m)   (((m) & SCE_S_IFMT) == SCE_S_IFDIR)
+#endif
 
 int config = 0;
 
@@ -36,15 +39,15 @@ static int cmpstringp(const void *p1, const void *p2) {
 	SceIoDirent *entryA = (SceIoDirent *)p1;
 	SceIoDirent *entryB = (SceIoDirent *)p2;
 
-	if ((SCE_STM_ISDIR(entryA->d_stat.st_mode)) && !(SCE_STM_ISDIR(entryB->d_stat.st_mode)))
+	if ((SCE_S_ISDIR(entryA->d_stat.st_mode)) && !(SCE_S_ISDIR(entryB->d_stat.st_mode)))
 		return -1;
-	else if (!(SCE_STM_ISDIR(entryA->d_stat.st_mode)) && (SCE_STM_ISDIR(entryB->d_stat.st_mode)))
+	else if (!(SCE_S_ISDIR(entryA->d_stat.st_mode)) && (SCE_S_ISDIR(entryB->d_stat.st_mode)))
 		return 1;
 	else {
-		if (config == 0) // Sort alphabetically (ascending - A to Z)
-			return strcasecmp(entryA->d_name, entryB->d_name);
-		else if (config == 1) // Sort alphabetically (descending - Z to A)
-			return strcasecmp(entryB->d_name, entryA->d_name);
+		if (config == 0) // Sort naturally (ascending: Ep1, Ep2 ... Ep10, Ep20)
+			return strcmpnat(entryA->d_name, entryB->d_name);
+		else if (config == 1) // Sort naturally (descending)
+			return strcmpnat(entryB->d_name, entryA->d_name);
 		else if (config == 2) // Sort by file size (largest first)
 			return entryA->d_stat.st_size > entryB->d_stat.st_size ? -1 : entryA->d_stat.st_size < entryB->d_stat.st_size ? 1 : 0;
 		else if (config == 3) // Sort by file size (smallest first)
@@ -62,6 +65,45 @@ int getDirListing(SceBool refresh)
 	file_count = 0;
 
     SceBool parent_dir_set = SCE_FALSE;
+
+    // Virtual root: when curDir is empty, list the available storage devices
+    // instead of a real directory, so the user can choose ux0:, uma0:, etc.
+    if (curDir[0] == '\0') {
+        static const char *devices[] = {
+            "ux0:", "uma0:", "ur0:", "imc0:", "xmc0:", "grw0:"
+        };
+        char probe[16];
+        for (int d = 0; d < (int)(sizeof(devices) / sizeof(devices[0])); d++) {
+            snprintf(probe, sizeof(probe), "%s/", devices[d]);
+            if (!dirExists(probe))
+                continue;
+
+            File *item = (File *)malloc(sizeof(File));
+            memset(item, 0, sizeof(File));
+            item->is_dir = SCE_TRUE;
+            strcpy(item->name, devices[d]);
+            file_count++;
+
+            if (files == NULL)
+                files = item;
+            else {
+                File *list = files;
+                while (list->next != NULL)
+                    list = list->next;
+                list->next = item;
+            }
+        }
+
+        if (!refresh) {
+            if (position >= file_count)
+                position = file_count - 1;
+        }
+        else
+            position = 0;
+
+        return 0;
+    }
+
     if (R_SUCCEEDED(dir = sceIoDopen(curDir))) {
         int count = 0;
         SceIoDirent *entries = (SceIoDirent *)calloc(MAX_FILES, sizeof(SceIoDirent));
@@ -86,7 +128,7 @@ int getDirListing(SceBool refresh)
 				if ((i == -1) && (!(strcmp(curDir, root_path))))
 					continue;
 
-				item->is_dir = SCE_STM_ISDIR(entries[i].d_stat.st_mode);
+				item->is_dir = SCE_S_ISDIR(entries[i].d_stat.st_mode);
 
 				// Copy File Name
 				strcpy(item->name, entries[i].d_name);
@@ -155,6 +197,19 @@ void displayFiles() {
 			else
 				vita2d_pgf_draw_text(pgf, startXScale, (FRAMEBUF_HEIGHT*ENTRY_SCALE/2.0f) + (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed), RGBA8(255, 255, 255, 255), basePgfScale*.9f, file->name);
 
+			// Watched / in-progress dot for video files (green = watched, orange = partway)
+			if (!file->is_dir && !strncasecmp(file->ext, "mp4", 4)) {
+				char fullPath[512];
+				snprintf(fullPath, sizeof(fullPath), "%s%s", curDir, file->name);
+				int watchState = watchdbGetState(fullPath);
+				if (watchState != WATCH_UNWATCHED) {
+					float dotSize = FRAMEBUF_HEIGHT*ENTRY_SCALE*0.28f;
+					float dotY = (FRAMEBUF_HEIGHT*ENTRY_SCALE*(float)printed) + (FRAMEBUF_HEIGHT*ENTRY_SCALE - dotSize)/2.0f;
+					unsigned int dotColor = (watchState == WATCH_WATCHED) ? RGBA8(40, 200, 40, 255) : RGBA8(255, 170, 0, 255);
+					vita2d_draw_rectangle(FRAMEBUF_WIDTH*0.022f, dotY, dotSize, dotSize, dotColor);
+				}
+			}
+
 			printed++;
 		}
 
@@ -192,7 +247,10 @@ int navigate(SceBool parent) {
 			}
 		}
 
-		slash[0] = 0; // Terminate working directory
+		if (slash == NULL)
+			curDir[0] = 0; // At a device root (e.g. "ux0:/") -> back to device list
+		else
+			slash[0] = 0; // Terminate working directory
 	}
 
 	// Normal folder
@@ -234,19 +292,15 @@ void openFile(void) {
 
 int getLastDirectory(void) {
 	int ret = 0;
-	const char *root_paths[] = {
-		"ux0:/",
-		"ur0:/",
-		"uma0:/"
-	};
-	
+
+	// Empty root_path means the virtual device-selection screen is the top
+	// level, so navigation can reach every mounted device (ux0:, uma0:, ...).
+	root_path[0] = '\0';
+
 	if (!fileExists("ux0:data/SubPlayer/lastdir.txt")) {
-		snprintf(root_path, 8, "ux0:/");
-		writeFile("ux0:data/SubPlayer/lastdir.txt", root_path, strlen(root_path) + 1);
-		strcpy(curDir, root_path); // Set Start Path to "sdmc:/" if lastDir.txt hasn't been created.
+		curDir[0] = '\0'; // Start on the device list
 	}
 	else {
-		strcpy(root_path, root_paths[0]);
 		SceOff size = 0;
 
 		getFileSize("ux0:data/SubPlayer/lastdir.txt", &size);
@@ -259,16 +313,17 @@ int getLastDirectory(void) {
 
 		buf[size] = '\0';
 		char path[512];
+		path[0] = '\0';
 		sscanf(buf, "%[^\n]s", path);
-	
-		if (dirExists(path)) // Incase a directory previously visited had been deleted, set start path to sdmc:/ to avoid errors.
+
+		if (path[0] != '\0' && dirExists(path)) // Restore last dir if it still exists...
 			strcpy(curDir, path);
 		else
-			strcpy(curDir, root_path);
-		
+			curDir[0] = '\0'; // ...otherwise fall back to the device list
+
 		free(buf);
 	}
-	
+
 	return 0;
 }
 

@@ -8,6 +8,7 @@
 #define ROUND_UP(x, a)	((((unsigned int)x)+((a)-1u))&(~((a)-1u)))
 
 int readControls(void);
+int strcmpnat(const char *a, const char *b);
 int getEnterButton(void);
 int getCancelButton(void);
 void setMax(int *set, int value, int max);
