@@ -3,7 +3,10 @@
 # Drives the VitaSDK toolchain directly (no cmake/make required).
 set -e
 
-: "${VITASDK:=/c/Dev/vitasdk}"
+# The toolchain lives alongside the project (../vitasdk, i.e. C:\Dev\VitaVideo\vitasdk)
+# so the whole project is self-contained. Override VITASDK to use one elsewhere.
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+: "${VITASDK:=$SELF_DIR/../vitasdk}"
 export VITASDK
 PREFIX="$VITASDK/bin/arm-vita-eabi"
 CC="$PREFIX-gcc"
