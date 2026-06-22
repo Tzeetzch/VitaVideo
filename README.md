@@ -1,23 +1,65 @@
-# Vita-Media-Player
-An Open Source PSVita/TV MP4 player with 1080p playback and subtitle support
+# VitaVideo
 
-1080i output supported on the PSTV natively and on the Vita with Sharpscale
+A reworked, open-source MP4 video player for the PS Vita / PSTV — a fork of
+[SonicMastr's Vita-Media-Player](https://github.com/SonicMastr/Vita-Media-Player)
+ported to the **free [VitaSDK](https://vitasdk.org) toolchain** and reshaped
+around comfortable couch/in-bed viewing.
 
-SRT subtitle support (Has to be the same name as the video file)
+The on-device app is still called **Vita Media Player** (Title ID `SVMP00001`);
+"VitaVideo" is the name of this fork.
 
-MKVs do NOT work. If you want to preserve subtitles with MKVs I recommend using Handbrake to convert them to MP4 with Timed Text Subtitles. Direct FFMPEG will also work.
+## What's different from upstream
 
+This fork keeps the original's hardware-accelerated `SceAvPlayer` playback and SRT
+subtitle support, and adds:
 
-![image](https://user-images.githubusercontent.com/40341589/113678803-ac918700-9684-11eb-9581-2c76fce52e46.png)
+- **Free-toolchain build** — compiles with the open VitaSDK directly via a single
+  `build.sh` (no proprietary SDK, no cmake/make required).
+- **Better browsing** — browses both `ux0:` and `uma0:`, touch navigation, sort
+  options, per-file progress bars, and a "continue watching" banner.
+- **Resume & watched tracking** — remembers where you stopped, marks items watched,
+  and offers continue / next-episode actions.
+- **Home / Folders / Settings tabs** with **Favorites** and **recently-watched** on Home.
+- **Per-item action menu** — Play / Restart / Mark watched / Reset progress.
+- **Touch player HUD** — on-screen icon buttons for playback control.
+- **"Tent mode" comfort features** — brightness levels, an auto-arming **sleep timer**
+  (off / 15 / 30 / 60 min), and a battery indicator, for watching in bed or a tent.
+- **Persistent settings** — sort order, brightness, and default sleep timer are saved
+  to `ux0:data/SubPlayer/settings.txt`.
 
-![image](https://user-images.githubusercontent.com/40341589/113678919-d185fa00-9684-11eb-9dc9-2c30f9f49daf.png)
+## Subtitles
 
-![image](https://user-images.githubusercontent.com/40341589/113679024-e9f61480-9684-11eb-8cb7-0afaa817d4a0.png)
+SRT subtitle support (the `.srt` must have the same filename as the video).
 
+MKVs do **not** work. To preserve subtitles, convert to MP4 with Timed Text subtitles
+(e.g. via HandBrake or FFmpeg).
 
-## Note to Devs
-SceAvPlayer does not support 1080p video playback by default. You need to patch the module in order to do so. That's what [ReAvPlayer](https://github.com/SonicMastr/ReAvPlayer) is for.
+## Building
 
-## Special Thanks
+Requires the free VitaSDK. The build script drives the toolchain directly:
 
-#### 1080p Video Playback was made possible by GrapheneCt and his Reverse Engineering efforts into SceAvPlayer<br><br>Cuevavirus for Sharpscale providing 1080i support<br><br>Joel16 for the original ElevenMPV file browser used as a base (I can't do UI)<br><br>SomeonPC for Livearea Assets<br><br>And Usagi for constantly getting on my ass to get this to work.
+```bash
+# VITASDK defaults to /c/Dev/vitasdk; override the env var if yours differs
+bash build.sh          # stable: Title ID SVMP00001  -> build/VitaMediaPlayer.vpk
+bash build.sh dev      # dev:    Title ID SVMP00002  -> installs as a second bubble
+```
+
+Install the resulting `.vpk` with VitaShell.
+
+> The eboot is built **unsafe** (full permissions) on purpose: the hardware video
+> decoder and the taiHEN-based `reAvPlayer` plugin need restricted APIs that a safe
+> eboot is denied.
+
+## Credits
+
+All of the original work is by **SonicMastr** and contributors — see the
+[upstream repository](https://github.com/SonicMastr/Vita-Media-Player). This fork
+only ports the build to the free VitaSDK and adds the features listed above.
+
+Original special thanks:
+
+- **GrapheneCt** — reverse-engineering of `SceAvPlayer` that made high-res playback possible
+- **Cuevavirus** — Sharpscale (1080i support)
+- **Joel16** — the original ElevenMPV file browser used as a UI base
+- **SomeonPC** — Livearea assets
+- **Usagi** — relentless encouragement
