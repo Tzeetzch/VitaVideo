@@ -56,3 +56,6 @@ build
 
 # Built VPKs are archived here but are rebuildable from tagged source commits
 releases
+
+# Local reference material (upstream / RE sources used while porting; not part of the build)
+reference
